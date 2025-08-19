@@ -1,0 +1,865 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Charalampos's Adventures — The Guardian's Riddle</title>
+<style>
+  /* ===== Variables and Base Styles ===== */
+  :root{
+    --bg:#0f0f16; --ink:#f8f7f4; --gold:#ffe8b0; --panel:#0c0c12;
+    --ok:#1f6f3d; --err:#7f1d1d; --line:#0008; --inkmut:#e9e5da;
+  }
+  html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family:system-ui,Segoe UI,Roboto,Inter,Arial}
+  body.modal-open{overflow:hidden}
+
+  /* ===== SPLASH (glowing library) ===== */
+  #splash{position:fixed; inset:0; z-index:80; display:flex; flex-direction:column; background:#000}
+  #splash::before{content:""; position:absolute; inset:0; background:url("splash.png") center/cover no-repeat; filter:saturate(.95) contrast(1.05)}
+  .splash-top{position:relative; z-index:1; display:flex; flex-direction:column; align-items:flex-start; gap:6px; padding:18px 20px}
+  .splash-title{margin:0; color:var(--gold); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; font-size:clamp(19px,3.1vw,34px); text-shadow:0 2px 6px #000}
+  .splash-credit{margin:0; color:#fff; white-space:nowrap; text-shadow:none; font-style:italic; font-size:clamp(14px,1.8vw,18px)}
+  .splash-center{ position:relative; z-index:1; margin:auto; text-align:center; padding:20px; }
+  .enter-btn{background:transparent; border:none; box-shadow:none; text-shadow:none; cursor:pointer; font-family:"Brush Script MT","Segoe Script","URW Chancery L",cursive; font-size:clamp(28px,5vw,48px); color:#fff; padding:0}
+  .enter-btn:hover{opacity:.92}
+  .enter-btn:focus{outline:0}
+
+  /* ===== APP WRAP ===== */
+  .wrap{min-height:100vh;display:flex;flex-direction:column}
+  header{padding:16px 18px;background:#0b0f14;border-bottom:1px solid #0007}
+  header h1{margin:.2em 0;color:var(--gold);font-size:clamp(20px,2.4vw,28px)}
+  header .credit{font-style:italic;opacity:.9;color:var(--inkmut)}
+  header .top-actions{margin-top:8px; display:flex; gap:8px; flex-wrap:wrap}
+
+  main{flex:1; display:grid; grid-template-columns: minmax(520px,560px) minmax(580px,1fr); gap:32px; padding:18px; align-items:start; box-sizing:border-box; max-width:1500px; margin:0 auto; width:100%}
+  @media (max-width:1200px){ main{grid-template-columns:1fr} .board{order:-1} }
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;box-shadow:0 10px 24px #0008;padding:14px;position:relative}
+
+  /* LEFT BOARD — book map */
+  .board{position:relative;min-height:600px;overflow:hidden;width:100%;max-width:560px;margin:0 auto; background:url("great-library.png") center/cover no-repeat; background-size: cover;}
+  .board::before{content:""; position:absolute; inset:0; z-index:0; background:rgba(6,10,16,.45)}
+  .board::after{content:""; position:absolute; inset:0; z-index:0; box-shadow: inset 0 0 80px 18px rgba(0,0,0,.45); pointer-events:none}
+  .node{position:absolute;width:64px;height:64px;border-radius:50%;display:flex;align-items:center;justify-content:center; border:2px solid #d4af37;background:#0f0a07;color:var(--gold);font-weight:900;cursor:pointer;user-select:none; z-index:2}
+  .node.locked{opacity:.5;cursor:not-allowed;filter:grayscale(.4)}
+  .node.done{background:#102614;border-color:#2d7a45;color:#eaffee}
+  .node.glow{box-shadow:0 0 0 10px rgba(212,175,55,.22),0 0 18px #d4af37}
+  .me{position:absolute;left:0;top:0;width:44px;height:44px;border-radius:50%;border:2px solid #d4af37;background:#1f4d36; z-index:2}
+  .legend{position:absolute;left:14px;bottom:14px;display:flex;gap:10px;flex-wrap:wrap; z-index:2}
+  .pill{display:inline-block;padding:6px 10px;border-radius:999px;border:1px solid #444;background:#0003;color:var(--inkmut)}
+
+  /* RIGHT CONTENT */
+  #content{min-height:600px; position:relative}
+  h2{margin:.2em 0;color:var(--gold)}
+  .runes{display:flex;gap:8px;margin:8px 0}
+  .r{position:relative;width:34px;height:34px;border-radius:6px;border:1px solid #d4af37;background:#0003;display:flex;align-items:center;justify-content:center;color:var(--gold);font-weight:900}
+  .r.got{background:#132713;border-color:#2c7a45;color:#e7ffe9}
+  .box{padding:12px;border:1px solid #0007;border-radius:12px;background:#0f0a07}
+  .q{margin:10px 0;padding:12px;border:1px solid #0006;border-radius:10px;background:#100a07}
+  .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+  .btn{appearance:none;border:1px solid #b78c18;background:linear-gradient(180deg,#7a5a12,#3f2d0a);color:#ffe8a3;border-radius:10px;padding:10px 14px;cursor:pointer}
+  .btn.ghost{border-color:#444;background:#0003;color:#fff}
+  .pill.ok{background:#09361b;border-color:#12552b;color:#d7ffe0}
+  .pill.err{background:#3b0d0d;border-color:#5a1111;color:#ffd7d7}
+  select,button,input{font-size:17px}
+  .mini{margin-left:8px;font-size:.95rem}
+  .mini.good{color:#8dffb0}
+  .mini.bad{color:#ffb0b0}
+  .divider{height:1px;background:#0008;margin:14px 0}
+  footer{padding:10px 14px;text-align:center;background:#0b0f14;border-top:1px solid #000;color:#cbbfa9}
+  .choices{display:flex;gap:16px;flex-wrap:wrap;margin-top:8px}
+  label.choice{display:flex;align-items:center;gap:8px;padding:8px 12px;border:1px solid #444;border-radius:10px;background:#0003;cursor:pointer}
+
+  /* Scenes (for your images) */
+  .scene{margin:8px 0;border-radius:12px;overflow:hidden;border:1px solid #111;background:#000}
+  .scene img{width:100%;height:auto;display:block;aspect-ratio:16/9;object-fit:cover}
+
+  /* ======= Modals ======= */
+  #modalBackdrop{display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:50}
+  .modal{display:none;position:fixed;inset:0;z-index:51;align-items:center;justify-content:center}
+  .modal-card{width:min(900px,94vw);max-height:90vh;overflow:auto;background:#10141c;border:1px solid #000; box-shadow:0 20px 40px #000;border-radius:14px;padding:16px}
+  .modal-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;gap:8px;flex-wrap:wrap}
+  .modal-title{margin:0;color:var(--gold);font-size:1.2rem}
+  .two-col{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  @media (max-width:800px){ .two-col{grid-template-columns:1fr} .modal-card{padding:14px} }
+
+  /* Characters gallery (re-using your existing heroes) */
+  .gallery{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px}
+  .thumb{position:relative;border-radius:12px;overflow:hidden;border:1px solid #222;background:#0b0806}
+  .thumb img{width:100%;aspect-ratio:3/4;object-fit:cover;display:block}
+  .thumb .cap{position:absolute;inset:auto 0 0 0;background:linear-gradient(180deg,transparent,rgba(0,0,0,.75)); color:#fff;padding:8px 10px;font-size:.9rem}
+  .thumb button{position:absolute;inset:0;opacity:0}
+  .gallery-note{color:#cbbfa9;font-size:.95rem;margin-top:6px}
+
+  /* Lightbox */
+  #viewer{display:none;position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:60;align-items:center;justify-content:center}
+  #viewerInner{max-width:min(1100px,92vw);max-height:92vh;display:flex;flex-direction:column;gap:10px}
+  #viewerImg{max-width:100%;max-height:82vh;object-fit:contain;border-radius:12px}
+  #viewerCap{color:#fff;text-align:center}
+  .viewer-actions{position:fixed;inset:0;pointer-events:none}
+  .viewer-btn{pointer-events:auto;position:absolute;top:50%;transform:translateY(-50%); background:#0008;border:1px solid #555;color:#fff;border-radius:12px;padding:10px 14px;cursor:pointer}
+  .viewer-btn.prev{left:12px}
+  .viewer-btn.next{right:12px}
+  .viewer-btn.close{top:12px;right:12px;transform:none}
+
+  .cat-note{
+    position:absolute; right:-6px; top:-120px; width:min(128px,18%); aspect-ratio:4/3;
+    /* This image was not provided, so the cat-note div is left without a background. */
+  }
+  @media (max-width:800px){
+    .cat-note{width:112px; right:-4px; top:-100px}
+  }
+
+/* auto-fix: scale scene & character images 40% smaller */
+#content img:not(#viewerImg){ max-width:60%; height:auto; }
+/* keep gallery thumbs controlled separately if needed */
+</style>
+</head>
+<body>
+
+<!-- ===== Splash ===== -->
+<section id="splash" aria-label="Intro screen with library">
+  <div class="splash-top">
+    <h1 class="splash-title">Charalampos's Adventures — The Guardian's Riddle</h1>
+    <p class="splash-credit">Based on a concept by Panagiotis Domvros, English and Drama Educator, All Rights Reserved</p>
+  </div>
+  <div class="splash-center">
+    <button class="enter-btn" id="enterBtn" type="button" aria-label="Enter the library">Enter</button>
+  </div>
+</section>
+
+<!-- ===== App ===== -->
+<div id="app" class="wrap" style="display:none">
+  <header>
+    <h1>Charalampos's Adventures — The Guardian's Riddle</h1>
+    <div class="credit">A Modal Verbs Quest</div>
+    <div class="top-actions">
+      <button class="btn" type="button" id="openStory">Story Intro</button>
+      <button class="btn ghost" type="button" id="openCodex">Codex & Glossary</button>
+      <button class="btn ghost" type="button" id="openCharacters">Characters</button>
+    </div>
+  </header>
+
+  <main>
+    <!-- LEFT: BOARD -->
+    <section class="panel board" id="board" aria-label="Quest Board">
+      <div id="me" class="me" title="Charalampos"></div>
+      <div class="node" id="n1" style="left:22px;top:24px" role="button" tabindex="0" aria-label="Node 1">1</div>
+      <div class="node locked" id="n2" style="left:150px;top:140px" role="button" tabindex="0" aria-label="Node 2">2</div>
+      <div class="node locked" id="n3" style="left:50px;top:280px" role="button" tabindex="0" aria-label="Node 3">3</div>
+      <div class="node locked" id="n4" style="left:220px;top:340px" role="button" tabindex="0" aria-label="Node 4">4</div>
+      <div class="node locked" id="n5" style="left:360px;top:230px" role="button" tabindex="0" aria-label="Node 5">5</div>
+      <div class="node locked" id="n6" style="left:440px;top:360px" role="button" tabindex="0" aria-label="Node 6">6</div>
+      <div class="node locked" id="n7" style="left:440px;top:120px" role="button" tabindex="0" aria-label="Finale">🏆</div>
+
+      <div class="legend" aria-hidden="true">
+        <span class="pill">Click <b>1</b> to start</span>
+        <span class="pill">Green = done</span>
+        <span class="pill">🏆 = Archives</span>
+      </div>
+    </section>
+
+    <!-- RIGHT: TASKS -->
+    <section class="panel" id="content">
+      <div class="cat-note" aria-hidden="true"></div>
+
+      <div id="intro">
+        <h2>The Guardian's Riddle</h2>
+        <p>The Guardian of the Great Library has sealed the Archives. To pass, Charalampos must master <strong>modal verbs</strong> of necessity, advice, permission, and ability.</p>
+        <div class="scene"><img src="introduction.png" alt="Charalampos and the Guardian in the library"></div>
+        <div class="runes"><div class="r" id="r1">_</div><div class="r" id="r2">_</div><div class="r" id="r3">_</div><div class="r" id="r4">_</div><div class="r" id="r5">_</div><div class="r" id="r6">_</div></div>
+        <p><button class="btn" id="startQuest" type="button">Start Quest</button></p>
+        <div class="divider"></div>
+        <div class="box"><b>Tip:</b> Choose carefully; the Guardian accepts only precision.</div>
+      </div>
+
+      <!-- TASK 1 — Necessity & Obligation -->
+      <div id="t1" style="display:none">
+        <h2>Task 1 — Necessity & Obligation</h2>
+        <div class="scene"><img src="great-library.png" alt="The great library"></div>
+        <p>Choose the modal verb that best fits each sentence.</p>
+        <div id="t1-list"></div>
+        <div class="row"><button class="btn" id="check1">Check</button> <button class="btn secondary" id="reset1">Reset</button><span id="msg1" class="pill" aria-live="polite"></span></div>
+      </div>
+
+      <!-- TASK 2 — Advice & Recommendation -->
+      <div id="t2" style="display:none">
+        <h2>Task 2 — Advice & Recommendation</h2>
+        <div class="scene"><img src="puzzle-chamber.png" alt="A puzzle chamber"></div>
+        <p>Choose the correct modal verb for advice or weak obligation.</p>
+        <div id="t2-list"></div>
+        <div class="row"><button class="btn" id="check2">Check</button> <button class="btn secondary" id="reset2">Reset</button><span id="msg2" class="pill" aria-live="polite"></span></div>
+      </div>
+
+      <!-- TASK 3 — Permission -->
+      <div id="t3" style="display:none">
+        <h2>Task 3 — Permission</h2>
+        <div class="scene"><img src="archives.png" alt="The forbidden archives"></div>
+        <p>Select the correct modal verb for asking for or giving permission.</p>
+        <div id="t3-list"></div>
+        <div class="row"><button class="btn" id="check3">Check</button> <button class="btn secondary" id="reset3">Reset</button><span id="msg3" class="pill" aria-live="polite"></span></div>
+      </div>
+
+      <!-- TASK 4 — Ability -->
+      <div id="t4" style="display:none">
+        <h2>Task 4 — Ability</h2>
+        <div class="scene"><img src="guardian.png" alt="The Guardian"></div>
+        <p>Fill in the blanks with the correct form of the verb expressing ability.</p>
+        <div id="t4-list"></div>
+        <div class="row"><button class="btn" id="check4">Check</button> <button class="btn secondary" id="reset4">Reset</button><span id="msg4" class="pill" aria-live="polite"></span></div>
+      </div>
+
+      <!-- TASK 5 — Mixed Modals -->
+      <div id="t5" style="display:none">
+        <h2>Task 5 — Mixed Modals</h2>
+        <div class="scene"><img src="great-library.png" alt="The great library"></div>
+        <p>A mix of all the modal verbs you've learned. Choose carefully!</p>
+        <div id="t5-list"></div>
+        <div class="row"><button class="btn" id="check5">Check</button> <button class="btn secondary" id="reset5">Reset</button><span id="msg5" class="pill" aria-live="polite"></span></div>
+      </div>
+
+      <!-- TASK 6 — The Final Riddle -->
+      <div id="t6" style="display:none">
+        <h2>Task 6 — The Final Riddle</h2>
+        <div class="scene"><img src="archives.png" alt="The forbidden archives"></div>
+        <p>Complete this final dialogue to free the Archives.</p>
+        <div id="t6-list"></div>
+        <div class="row"><button class="btn" id="check6">Check</button> <button class="btn secondary" id="reset6">Reset</button><span id="msg6" class="pill" aria-live="polite"></span></div>
+      </div>
+
+      <!-- FINALE -->
+      <div id="finale" style="display:none">
+        <h2>The Archives are Open!</h2>
+        <p><b>Victory!</b> The Archives are unlocked, and the Guardian stands aside, bowing its head in respect. Your journey through the language of necessity and permission is complete.</p>
+        <div class="scene"><img src="final-gate.png" alt="The final gate slightly ajar with light shining through"></div>
+        <div class="runes"><div class="r got">M</div><div class="r got">O</div><div class="r got">D</div><div class="r got">A</div><div class="r got">L</div><div class="r got">S</div></div>
+        <div class="row"><button class="btn" id="replay">Play again</button></div>
+      </section>
+  </main>
+
+  <footer>✨✍️ Devised by Panagiotis Domvros, English and Drama Teacher, All Rights Reserved ✍️✨</footer>
+</div>
+
+<!-- ======= Backdrop ======= -->
+<div id="modalBackdrop" aria-hidden="true"></div>
+
+<!-- Story Intro Modal -->
+<div id="storyModal" class="modal" aria-modal="true" role="dialog" aria-labelledby="storyTitle" aria-hidden="true">
+  <div class="modal-card">
+    <div class="modal-head">
+      <h2 id="storyTitle" class="modal-title">Story Intro — The Guardian's Riddle</h2>
+      <button class="btn ghost" id="closeStory" type="button">Close</button>
+    </div>
+    <div id="storyPages">
+      <div class="storyPage">
+        <h3>1) Setup</h3>
+        <p>The Great Library holds all knowledge, but its Forbidden Archives are sealed by an ancient, linguistic enchantment. Only those who master the Guardian’s riddles may enter.</p>
+      </div>
+      <div class="storyPage" style="display:none">
+        <h3>2) Goal</h3>
+        <p>Your goal is to use modal verbs of obligation, advice, permission, and ability to pass each trial. Precision is paramount; the Guardian accepts no errors.</p>
+      </div>
+      <div class="storyPage" style="display:none">
+        <h3>3) The Guardian</h3>
+        <p>The Guardian is a wise, spectral being that only speaks in formal, precise language. It will not guide you, but it will judge your answers. Failure means starting over.</p>
+      </div>
+      <div class="storyPage" style="display:none">
+        <h3>4) How to Play</h3>
+        <ol>
+          <li>Answer 10 multiple-choice questions per challenge.</li>
+          <li>Each correct answer earns a fragment of the final phrase.</li>
+          <li>Solve all challenges to unlock the Archives.</li>
+        </ol>
+      </div>
+    </div>
+    <div style="display:flex;justify-content:space-between;margin-top:10px;align-items:center;gap:8px">
+      <button class="btn ghost" id="prevStory" type="button">◀ Prev</button>
+      <div class="pill" id="storyStep" aria-live="polite">1 / 4</div>
+      <button class="btn" id="nextStory" type="button">Next ▶</button>
+    </div>
+  </div>
+</div>
+
+<!-- Codex & Glossary Modal -->
+<div id="codexModal" class="modal" aria-modal="true" role="dialog" aria-labelledby="codexTitle" aria-hidden="true">
+  <div class="modal-card">
+    <div class="modal-head">
+      <h2 id="codexTitle" class="modal-title">Codex & Glossary</h2>
+      <button class="btn ghost" id="closeCodex" type="button">Close</button>
+    </div>
+    <div class="two-col">
+      <div class="box">
+        <h3>Necessity & Obligation</h3>
+        <ul>
+          <li><b>must</b>: expresses strong personal necessity or a strong command.</li>
+          <li><b>have to</b>: expresses necessity or obligation from an external authority or rule.</li>
+          <li><b>mustn't</b>: expresses prohibition.</li>
+          <li><b>don't have to</b>: expresses lack of necessity.</li>
+        </ul>
+      </div>
+      <div class="box">
+        <h3>Advice & Permission</h3>
+        <ul>
+          <li><b>should / shouldn't</b>: gives advice or makes a recommendation.</li>
+          <li><b>ought to / oughtn't to</b>: similar to 'should', a bit more formal.</li>
+          <li><b>can / could / may</b>: used to ask for permission.</li>
+          <li><b>can / may</b>: used to give permission.</li>
+        </ul>
+        <h3>Ability</h3>
+        <ul>
+          <li><b>can</b>: expresses present ability.</li>
+          <li><b>could</b>: expresses past ability.</li>
+          <li><b>be able to</b>: used for ability in other tenses (future, perfect).</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Characters Modal -->
+<div id="charactersModal" class="modal" aria-modal="true" role="dialog" aria-labelledby="charactersTitle" aria-hidden="true">
+  <div class="modal-card" style="width:min(1000px,95vw)">
+    <div class="modal-head">
+      <h2 id="charactersTitle" class="modal-title">Characters & Places</h2>
+      <button class="btn ghost" id="closeCharacters" type="button">Close</button>
+    </div>
+    <div class="gallery" id="gallery">
+      <figure class="thumb" data-src="Charalampos Keramefs.jpg" data-cap="Charalampos Keramefs — The Hero">
+        <img src="Charalampos Keramefs.jpg" alt="Charalampos Keramefs" loading="lazy">
+        <figcaption class="cap">Charalampos Keramefs</figcaption><button aria-label="View Charalampos Keramefs"></button>
+      </figure>
+      <figure class="thumb" data-src="Iris.jpg" data-cap="Iris — Grammar Ally">
+        <img src="Iris.jpg" alt="Iris" loading="lazy">
+        <figcaption class="cap">Iris</figcaption><button aria-label="View Iris"></button>
+      </figure>
+      <figure class="thumb" data-src="Drakon Malveris.jpg" data-cap="Drakon Malveris — The Rival">
+        <img src="Drakon Malveris.jpg" alt="Drakon Malveris" loading="lazy">
+        <figcaption class="cap">Drakon Malveris</figcaption><button aria-label="View Drakon Malveris"></button>
+      </figure>
+      <figure class="thumb" data-src="guardian.png" data-cap="The Guardian — Judge of Language">
+        <img src="guardian.png" alt="The Guardian" loading="lazy">
+        <figcaption class="cap">The Guardian</figcaption><button aria-label="View The Guardian"></button>
+      </figure>
+      <figure class="thumb" data-src="great-library.png" data-cap="The Great Library — Hall of Riddles">
+        <img src="great-library.png" alt="The Great Library" loading="lazy">
+        <figcaption class="cap">The Great Library</figcaption><button aria-label="View The Great Library"></button>
+      </figure>
+      <figure class="thumb" data-src="archives.png" data-cap="The Forbidden Archives — Final Destination">
+        <img src="archives.png" alt="The Forbidden Archives" loading="lazy">
+        <figcaption class="cap">The Forbidden Archives</figcaption><button aria-label="View The Forbidden Archives"></button>
+      </figure>
+    </div>
+    <p class="gallery-note">Click a card to enlarge. Use ◀ ▶ or swipe to navigate; press Esc to close.</p>
+  </div>
+</div>
+
+<!-- Lightbox viewer -->
+<div id="viewer" role="dialog" aria-modal="true" aria-label="Image viewer">
+  <div id="viewerInner">
+    <img id="viewerImg" alt="">
+    <div id="viewerCap"></div>
+  </div>
+  <div class="viewer-actions">
+    <button class="viewer-btn prev" id="viewerPrev" aria-label="Previous">◀</button>
+    <button class="viewer-btn next" id="viewerNext" aria-label="Next">▶</button>
+    <button class="viewer-btn close" id="viewerClose" aria-label="Close">✕</button>
+  </div>
+</div>
+
+<!-- Lore / Interlude Modal -->
+<div id="loreModal" class="modal" aria-modal="true" role="dialog" aria-labelledby="loreTitle" aria-hidden="true">
+  <div class="modal-card" style="width:min(760px,92vw)">
+    <div class="modal-head">
+      <h2 id="loreTitle" class="modal-title">A Step Echoes…</h2>
+      <button class="btn ghost" id="closeLore" type="button">Continue</button>
+    </div>
+    <div id="loreText" class="box" style="font-size:1.05rem;line-height:1.5"></div>
+  </div>
+</div>
+
+<script>
+/* ===== Splash control ===== */
+document.getElementById('enterBtn').addEventListener('click', ()=>{
+  const splash = document.getElementById('splash');
+  splash.style.opacity = '0';
+  splash.style.pointerEvents = 'none';
+  setTimeout(()=>{ splash.style.display='none'; }, 150);
+  document.getElementById('app').style.display='flex';
+});
+
+/* ===== Helpers ===== */
+const $=s=>document.querySelector(s);
+function show(id){['intro','t1','t2','t3','t4','t5','t6','finale'].forEach(x=>$('#'+x).style.display='none'); $('#'+id).style.display='block';}
+function tokenTo(nodeId){ const n=$('#'+nodeId), me=$('#me'); me.style.left=n.style.left; me.style.top=n.style.top; }
+function lock(id,yes){ $('#'+id).classList.toggle('locked', !!yes); }
+function done(id){ $('#'+id).classList.add('done'); }
+function giveRune(i,letter){ const el=$('#r'+i); el.textContent=letter; el.classList.add('got'); }
+
+/* ===== Start state ===== */
+tokenTo('n1'); $('#n1').classList.add('glow'); show('intro');
+
+/* ===== Board clicks ===== */
+['n1','n2','n3','n4','n5','n6','n7'].forEach(id=>{
+  const el = $('#'+id);
+  el.addEventListener('click',()=>{
+    if(el.classList.contains('locked')) return;
+    const tid = id==='n7' ? 'finale' : 't'+id.slice(1);
+    if(id==='n1') $('#n1').classList.remove('glow');
+    show(tid);
+  });
+  el.addEventListener('keydown',e=>{
+    if((e.key==='Enter'||e.key===' ') && !el.classList.contains('locked')){
+      e.preventDefault(); el.click();
+    }
+  });
+});
+
+$('#startQuest').onclick=()=>{ $('#n1').classList.remove('glow'); show('t1'); };
+
+/* ===== Modal utilities ===== */
+const backdrop = $('#modalBackdrop');
+const storyModal = $('#storyModal');
+const codexModal = $('#codexModal');
+const charactersModal = $('#charactersModal');
+const loreModal = $('#loreModal');
+function openModal(el){ backdrop.style.display='block'; el.style.display='flex'; el.setAttribute('aria-hidden','false'); document.body.classList.add('modal-open'); }
+function closeModal(el){
+  el.style.display='none'; el.setAttribute('aria-hidden','true');
+  const anyOpen = [storyModal,codexModal,charactersModal,loreModal].some(m=>m.style.display==='flex');
+  if(!anyOpen) { backdrop.style.display='none'; document.body.classList.remove('modal-open'); }
+}
+$('#openStory').addEventListener('click',()=>openModal(storyModal));
+$('#closeStory').addEventListener('click',()=>closeModal(storyModal));
+$('#openCodex').addEventListener('click',()=>openModal(codexModal));
+$('#closeCodex').addEventListener('click',()=>closeModal(codexModal));
+$('#openCharacters').addEventListener('click',()=>openModal(charactersModal));
+$('#closeCharacters').addEventListener('click',()=>closeModal(charactersModal));
+$('#closeLore').addEventListener('click',()=>closeModal(loreModal));
+
+/* Backdrop click closes whichever modal is open */
+backdrop.addEventListener('click',()=>[storyModal,codexModal,charactersModal,loreModal].forEach(m=>{ if(m.style.display==='flex') closeModal(m); }));
+
+/* ESC key */
+document.addEventListener('keydown',(e)=>{
+  if(e.key==='Escape'){
+    if($('#viewer').style.display==='flex'){ closeViewer(); return; }
+    const openInOrder=[loreModal,charactersModal,codexModal,storyModal];
+    const top=openInOrder.find(m=>m.style.display==='flex'); if(top) closeModal(top);
+  }
+});
+
+/* Story paging */
+const pages = Array.from(document.querySelectorAll('#storyPages .storyPage'));
+let pageIndex = 0;
+function showStoryPage(i){ pageIndex=Math.max(0,Math.min(i,pages.length-1)); pages.forEach((p,idx)=>p.style.display=(idx===pageIndex?'block':'none')); $('#storyStep').textContent=(pageIndex+1)+' / '+pages.length; }
+$('#nextStory').addEventListener('click',()=>showStoryPage(pageIndex+1));
+$('#prevStory').addEventListener('click',()=>showStoryPage(pageIndex-1));
+showStoryPage(0);
+
+/* Interludes */
+const loreText = $('#loreText');
+const loreByStage = {
+  1: `The gate shudders and opens with a click. “One step closer,” whispers the Guardian.`,
+  2: `The air fills with the scent of old parchment. The Guardian awaits your next answer.`,
+  3: `A shimmering light confirms your understanding. You are now permitted to proceed.`,
+  4: `The Guardian's eyes glow. "Your ability to reason is clear. The way is open."`,
+  5: `The path to the archives shimmers. The Guardian's voice echoes: "The final test is nigh."`,
+  6: `The final gate groans open. You have proven yourself worthy.`
+};
+function showInterlude(stageNum){ loreText.textContent=loreByStage[stageNum]||'You advance through the ancient library.'; openModal(loreModal); }
+
+/* --- Game Logic and Questions --- */
+const tasks = [
+    {
+      id: 't1',
+      msgId: 'msg1',
+      nodeId: 'n1',
+      nextId: 'n2',
+      rune: 'M',
+      loreStage: 1,
+      questions: [
+        { text: 'To pass, you must possess a token of entry.', answer: 'have to', options: ['must', 'have to', 'should'] },
+        { text: 'I really must finish this task to proceed.', answer: 'must', options: ['must', 'have to', 'don\'t have to'] },
+        { text: 'You mustn\'t touch the cursed books.', answer: 'mustn\'t', options: ['don\'t have to', 'mustn\'t', 'oughtn\'t to'] },
+        { text: 'We don\'t have to copy the notes; Iris already has them.', answer: 'don\'t have to', options: ['mustn\'t', 'must', 'don\'t have to'] },
+        { text: 'The guardian told us we must be silent in the Hall of Whispers.', answer: 'must', options: ['must', 'have to', 'ought to'] },
+        { text: 'To activate the glyphs, we have to first find the correct order.', answer: 'have to', options: ['must', 'don\'t have to', 'have to'] },
+        { text: 'Charalampos must find a solution soon, or the gate will close.', answer: 'must', options: ['must', 'have to', 'don\'t have to'] },
+        { text: 'Drakon mustn\'t enter, as he is forbidden.', answer: 'mustn\'t', options: ['don\'t have to', 'mustn\'t', 'oughtn\'t to'] },
+        { text: 'You don\'t have to take the golden key; the bronze one is enough.', answer: 'don\'t have to', options: ['must', 'have to', 'don\'t have to'] },
+        { text: 'You must pay attention to the runes to solve the puzzle.', answer: 'must', options: ['must', 'have to', 'should'] }
+      ]
+    },
+    {
+      id: 't2',
+      msgId: 'msg2',
+      nodeId: 'n2',
+      nextId: 'n3',
+      rune: 'O',
+      loreStage: 2,
+      questions: [
+        { text: 'You should listen to Iris, she knows the way.', answer: 'should', options: ['should', 'must', 'have to'] },
+        { text: 'We ought to go back; the path ahead is dangerous.', answer: 'ought to', options: ['must', 'ought to', 'have to'] },
+        { text: 'Charalampos shouldn\'t underestimate the Guardian.', answer: 'shouldn\'t', options: ['oughtn\'t to', 'mustn\'t', 'shouldn\'t'] },
+        { text: 'They ought to eat before they continue their quest.', answer: 'ought to', options: ['must', 'have to', 'ought to'] },
+        { text: 'You shouldn\'t give up now.', answer: 'shouldn\'t', options: ['don\'t have to', 'shouldn\'t', 'oughtn\'t to'] },
+        { text: 'The traveler should rest for a moment; he looks exhausted.', answer: 'should', options: ['should', 'ought to', 'must'] },
+        { text: 'You ought to be more polite when speaking to the Guardian.', answer: 'ought to', options: ['have to', 'should', 'ought to'] },
+        { text: 'We shouldn\'t have left so early; the sun is still high.', answer: 'shouldn\'t', options: ['mustn\'t', 'shouldn\'t', 'don\'t have to'] },
+        { text: 'You oughtn\'t to trust Drakon; he is always misleading.', answer: 'oughtn\'t to', options: ['don\'t have to', 'mustn\'t', 'oughtn\'t to'] },
+        { text: 'Charalampos should be careful with that artifact; it\'s fragile.', answer: 'should', options: ['must', 'have to', 'should'] }
+      ]
+    },
+    {
+      id: 't3',
+      msgId: 'msg3',
+      nodeId: 'n3',
+      nextId: 'n4',
+      rune: 'D',
+      loreStage: 3,
+      questions: [
+        { text: '... I take this book from the shelf?', answer: 'May', options: ['May', 'Can', 'Could'] },
+        { text: 'Yes, you ...', answer: 'may', options: ['can', 'may', 'should'] },
+        { text: '... I call a friend later?', answer: 'Could', options: ['Can', 'Could', 'May'] },
+        { text: 'No, you ... not. It\'s forbidden.', answer: 'can\'t', options: ['mustn\'t', 'can\'t', 'don\'t have to'] },
+        { text: 'We ... enter now that we have permission.', answer: 'can', options: ['can', 'may', 'should'] },
+        { text: '... I have your attention for a moment?', answer: 'Could', options: ['Can', 'Could', 'May'] },
+        { text: 'You ... borrow this map for your journey.', answer: 'can', options: ['must', 'can', 'ought to'] },
+        { text: '... I ask you a question?', answer: 'May', options: ['May', 'Can', 'Could'] },
+        { text: 'The Guardian said we ... pass now.', answer: 'can', options: ['may', 'must', 'can'] },
+        { text: '... I help you with that puzzle?', answer: 'Can', options: ['Could', 'Can', 'May'] }
+      ]
+    },
+    {
+      id: 't4',
+      msgId: 'msg4',
+      nodeId: 'n4',
+      nextId: 'n5',
+      rune: 'A',
+      loreStage: 4,
+      questions: [
+        { text: 'Charalampos ... speak many languages.', answer: 'can', options: ['can', 'could', 'is able to'] },
+        { text: 'Yesterday, he ... not find the archives.', answer: 'could', options: ['can', 'could', 'wasn\'t able to'] },
+        { text: 'After this trial, he ... activate the final gate.', answer: 'will be able to', options: ['can', 'will be able to', 'is able to'] },
+        { text: 'Drakon has never ... solve this riddle.', answer: 'been able to', options: ['can', 'been able to', 'could'] },
+        { text: 'With this key, we ... open the door now.', answer: 'can', options: ['can', 'may', 'should'] },
+        { text: 'Last year, I ... lift this heavy stone.', answer: 'could', options: ['can', 'could', 'will be able to'] },
+        { text: 'I wonder if Charalampos ... translate the old runes.', answer: 'is able to', options: ['can', 'could', 'is able to'] },
+        { text: 'He ... finish the quest before sunrise.', answer: 'might be able to', options: ['can', 'must', 'might be able to'] },
+        { text: 'If you read the scroll, you ... understand the history.', answer: 'can', options: ['can', 'could', 'have to'] },
+        { text: 'We have trained for years, so we ... now face the challenge.', answer: 'are able to', options: ['are able to', 'can', 'should'] }
+      ]
+    },
+    {
+      id: 't5',
+      msgId: 'msg5',
+      nodeId: 'n5',
+      nextId: 'n6',
+      rune: 'L',
+      loreStage: 5,
+      questions: [
+        { text: 'Iris says we ... not touch the ancient scrolls.', answer: 'mustn\'t', options: ['don\'t have to', 'mustn\'t', 'shouldn\'t'] },
+        { text: 'We ... leave now, or we\'ll miss the moonlight.', answer: 'should', options: ['must', 'should', 'have to'] },
+        { text: 'To solve the final riddle, we ... listen to the Guardian carefully.', answer: 'have to', options: ['must', 'should', 'have to'] },
+        { text: 'I ... not see the path without a torch.', answer: 'can\'t', options: ['couldn\'t', 'mustn\'t', 'can\'t'] },
+        { text: 'You ... ask the Guardian to open the gate, but he might say no.', answer: 'can', options: ['can', 'must', 'have to'] },
+        { text: 'Drakon ... have been cheating; he knew the answers too quickly!', answer: 'must', options: ['can', 'must', 'should'] },
+        { text: 'If you\'re not feeling well, you ... rest.', answer: 'should', options: ['should', 'must', 'have to'] },
+        { text: 'You ... not worry about the old lock; it\'s been broken for years.', answer: 'don\'t have to', options: ['mustn\'t', 'don\'t have to', 'oughtn\'t to'] },
+        { text: '... I use the forbidden knowledge to pass the test?', answer: 'May', options: ['Can', 'Could', 'May'] },
+        { text: 'He ... have the key with him, but I\'m not sure.', answer: 'could', options: ['should', 'could', 'must'] }
+      ]
+    },
+    {
+      id: 't6',
+      msgId: 'msg6',
+      nodeId: 'n6',
+      nextId: 'n7',
+      rune: 'S',
+      loreStage: 6,
+      questions: [
+        { text: 'Guardian: "You ... use the words of wisdom to free the archives."', answer: 'must', options: ['must', 'have to', 'should'] },
+        { text: 'Charalampos: "I ... to find a hidden phrase, is that right?"', answer: 'have to', options: ['must', 'have to', 'should'] },
+        { text: 'Guardian: "You ... not leave until you speak it."', answer: 'mustn\'t', options: ['mustn\'t', 'don\'t have to', 'oughtn\'t to'] },
+        { text: 'Charalampos: "Then I ... choose to speak the truth."', answer: 'must', options: ['should', 'must', 'can'] },
+        { text: 'Guardian: "You ... take what you need, and then you ... leave."', answer: 'can', options: ['can', 'may', 'should'] },
+        { text: 'Charalampos: "I wonder if I ... have a look at the books first?"', answer: 'may', options: ['can', 'may', 'should'] },
+        { text: 'Guardian: "You ... go, but you must be silent."', answer: 'could', options: ['can', 'may', 'could'] },
+        { text: 'Charalampos: "Oh no! I ... hear what the Guardian said!"', answer: 'can\'t', options: ['can\'t', 'couldn\'t', 'don\'t have to'] },
+        { text: 'Guardian: "Soon you ... understand my language."', answer: 'will be able to', options: ['can', 'will be able to', 'are able to'] },
+        { text: 'Charalampos: "I suppose I ... trust you on that."', answer: 'ought to', options: ['should', 'must', 'ought to'] }
+      ]
+    },
+];
+
+// Fisher-Yates shuffle algorithm
+function shuffle(array) {
+  let currentIndex = array.length, randomIndex;
+  while (currentIndex != 0) {
+    randomIndex = Math.floor(Math.random() * currentIndex);
+    currentIndex--;
+    [array[currentIndex], array[randomIndex]] = [array[randomIndex], array[currentIndex]];
+  }
+  return array;
+}
+
+// Function to generate the HTML for a given task
+
+// Auto-added helpers to mask modal verbs from question text
+function escapeRegExp(str){ return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
+function maskedText(text, options){
+  let out = text;
+  const words = Array.from(new Set(options || [])).sort((a,b)=>b.length-a.length);
+  words.forEach(w=>{
+    const re = new RegExp('\\b' + escapeRegExp(w) + '\\b','gi');
+    out = out.replace(re, '____');
+  });
+  return out;
+}
+
+function generateTaskHtml(task) {
+  const container = document.getElementById(task.id + '-list');
+  if (!container) return;
+
+  container.innerHTML = '';
+  task.questions.forEach((q, index) => {
+    const qDiv = document.createElement('div');
+    qDiv.className = 'q';
+    qDiv.innerHTML = `<label>${index + 1}) ${maskedText(q.text, q.options.concat([q.answer]))}</label><br>`;
+    const select = document.createElement('select');
+    select.id = `${task.id}-q${index + 1}`;
+    
+    // Shuffle the options to mix up the answers
+    const shuffledOptions = shuffle([...q.options]);
+    
+    const defaultOption = document.createElement('option');
+    defaultOption.value = '';
+    defaultOption.textContent = '—';
+    select.appendChild(defaultOption);
+    
+    shuffledOptions.forEach(opt => {
+      const option = document.createElement('option');
+      option.value = opt;
+      option.textContent = opt;
+      select.appendChild(option);
+    });
+    
+    qDiv.appendChild(select);
+    container.appendChild(qDiv);
+  });
+}
+
+// Function to check a given task
+
+function resetTask(task){
+  task.questions.forEach((q, index) => {
+    const sel = document.getElementById(`${task.id}-q${index + 1}`);
+    if (sel) sel.selectedIndex = 0;
+  });
+  const msg = document.getElementById(task.msgId);
+  if (msg){ msg.textContent=''; msg.classList.remove('ok','err'); }
+}
+
+function checkTask(task) {
+  let correctCount = 0;
+  task.questions.forEach((q, index) => {
+    const select = document.getElementById(`${task.id}-q${index + 1}`);
+    if (select.value === q.answer) {
+      correctCount++;
+    }
+  });
+
+  const msg = document.getElementById(task.msgId);
+  msg.classList.remove('ok', 'err');
+  if (correctCount === task.questions.length) {
+    msg.textContent = `✓ Correct. Rune: ${task.rune}`;
+    msg.classList.add('ok');
+    done(task.nodeId);
+    if (task.nextId) {
+      lock(task.nextId, false);
+      giveRune(tasks.indexOf(task) + 1, task.rune);
+      tokenTo(task.nextId);
+      showInterlude(task.loreStage);
+    } else {
+      show('finale');
+    }
+  } else {
+    msg.textContent = `✗ You got ${correctCount} out of ${task.questions.length} correct. Try again.`;
+    msg.classList.add('err');
+  }
+}
+
+// Generate all tasks on initial load
+document.addEventListener('DOMContentLoaded', () => {
+    tasks.forEach(task => generateTaskHtml(task));
+    
+    // Assign event listeners for check buttons
+    document.getElementById('check1').onclick = () => checkTask(tasks[0]);
+    document.getElementById('check2').onclick = () => checkTask(tasks[1]);
+    document.getElementById('check3').onclick = () => checkTask(tasks[2]);
+    document.getElementById('check4').onclick = () => checkTask(tasks[3]);
+    document.getElementById('check5').onclick = () => checkTask(tasks[4]);
+    document.getElementById('check6').onclick = () => checkTask(tasks[5]);
+});
+
+/* Replay */
+const replayBtn = $('#replay');
+if (replayBtn) replayBtn.onclick = () => location.reload();
+/* ===== Characters: lightbox viewer logic ===== */
+const gallery = $('#gallery');
+const viewer = $('#viewer');
+const viewerImg = $('#viewerImg');
+const viewerCap = $('#viewerCap');
+const viewerPrev = $('#viewerPrev');
+const viewerNext = $('#viewerNext');
+const viewerClose = $('#viewerClose');
+let items = [];
+let idx = 0;
+
+function collectItems(){
+  items = Array.from(gallery.querySelectorAll('.thumb')).map(el=>({
+    src: el.dataset.src,
+    cap: el.dataset.cap || el.querySelector('.cap')?.textContent || ''
+  }));
+}
+collectItems();
+
+function openViewer(i){
+  idx = Math.max(0, Math.min(i, items.length-1));
+  const it = items[idx];
+  viewerImg.src = it.src;
+  viewerImg.alt = it.cap || 'Image';
+  viewerCap.textContent = it.cap;
+  viewer.style.display = 'flex';
+}
+function closeViewer(){ viewer.style.display='none'; }
+function next(){ openViewer((idx+1)%items.length); }
+function prev(){ openViewer((idx-1+items.length)%items.length); }
+
+gallery.addEventListener('click', (e)=>{
+  const card = e.target.closest('.thumb'); if(!card) return;
+  const i = Array.from(gallery.querySelectorAll('.thumb')).indexOf(card);
+  openViewer(i);
+});
+viewerNext.addEventListener('click', next);
+viewerPrev.addEventListener('click', prev);
+viewerClose.addEventListener('click', closeViewer);
+viewer.addEventListener('click', (e)=>{ if(e.target===viewer) closeViewer(); });
+document.addEventListener('keydown',(e)=>{
+  if(viewer.style.display==='flex'){
+    if(e.key==='ArrowRight') next();
+    else if(e.key==='ArrowLeft') prev();
+  }
+});
+
+// Bind reset buttons
+['1','2','3','4','5','6'].forEach((n, idx)=>{
+  const btn = document.getElementById('reset'+n);
+  if (btn) btn.addEventListener('click', ()=> resetTask(tasks[idx]));
+});
+
+</script>
+
+<!-- ===== Teacher Answer Key (Hidden) ===== -->
+<style>
+#teacher-key-btn{
+  position: fixed; right: 16px; bottom: 16px; z-index: 9999;
+  padding: 10px 14px; border-radius: 999px; border: none;
+  background: linear-gradient(135deg,#5b5b5b,#2a2a2a); color:#fff;
+  box-shadow: 0 4px 16px rgba(0,0,0,.35); cursor: pointer; opacity:.65;
+}
+#teacher-key-btn:hover{ opacity:1; }
+#teacher-key{ display:none; position: fixed; inset: 0; z-index: 10000;
+  background: rgba(0,0,0,.6); align-items: center; justify-content: center; }
+#teacher-key .panel{
+  max-width: 800px; width: 92%; background: #111; color: #eee; border-radius: 14px;
+  padding: 20px; box-shadow: 0 10px 30px rgba(0,0,0,.5); overflow:auto; max-height:80vh;
+}
+#teacher-key h3{ margin-top:0 }
+#teacher-key .close{ float:right; background:#333; border:none; color:#eee; padding:6px 10px; border-radius:8px; cursor:pointer;}
+#teacher-key .grid{ display:grid; grid-template-columns: repeat(auto-fit, minmax(220px,1fr)); gap:12px; }
+#teacher-key .card{ background:#1b1b1b; padding:12px; border-radius:10px; }
+#teacher-auth{ display:flex; gap:8px; margin-bottom:12px; }
+#teacher-auth input{ flex:1; padding:8px 10px; border-radius:8px; border:1px solid #333; background:#0f0f0f; color:#fff; }
+#teacher-auth button{ padding:8px 12px; border-radius:8px; border:none; background:#444; color:#fff; cursor:pointer; }
+#teacher-auth .hint{ font-size:.85em; opacity:.75; }
+</style>
+
+<button id="teacher-key-btn" aria-label="Open teacher key">Teacher Key</button>
+
+<div id="teacher-key" role="dialog" aria-modal="true" aria-labelledby="teacher-key-title">
+  <div class="panel">
+    <button class="close" onclick="document.getElementById('teacher-key').style.display='none'">Close ✕</button>
+    <h3 id="teacher-key-title">Answer Key (Teachers)</h3>
+    <div id="teacher-auth">
+      <input id="teacher-pass" type="password" placeholder="Enter password">
+      <button id="teacher-unlock">Unlock</button>
+      <div class="hint" aria-live="polite" id="teacher-hint"></div>
+    </div>
+    <div id="teacher-key-content" style="display:none">
+      <div class="grid">
+        <div class="card"><strong>Task 1</strong><ol>
+          <li>have to</li><li>must</li><li>mustn’t</li><li>don’t have to</li><li>must</li>
+          <li>have to</li><li>must</li><li>mustn’t</li><li>don’t have to</li><li>must</li>
+        </ol></div>
+        <div class="card"><strong>Task 2</strong><ol>
+          <li>should</li><li>ought to</li><li>shouldn’t</li><li>ought to</li><li>shouldn’t</li>
+          <li>should</li><li>ought to</li><li>shouldn’t</li><li>oughtn’t to</li><li>should</li>
+        </ol></div>
+        <div class="card"><strong>Task 3</strong><ol>
+          <li>May</li><li>may</li><li>Could</li><li>can’t</li><li>can</li>
+          <li>Could</li><li>can</li><li>May</li><li>can</li><li>Can</li>
+        </ol></div>
+        <div class="card"><strong>Task 4</strong><ol>
+          <li>can</li><li>could</li><li>will be able to</li><li>been able to</li><li>can</li>
+          <li>could</li><li>is able to</li><li>might be able to</li><li>can</li><li>are able to</li>
+        </ol></div>
+        <div class="card"><strong>Task 5</strong><ol>
+          <li>mustn’t</li><li>should</li><li>have to</li><li>can’t</li><li>can</li>
+          <li>must</li><li>should</li><li>don’t have to</li><li>May</li><li>could</li>
+        </ol></div>
+        <div class="card"><strong>Task 6</strong><ol>
+          <li>must</li><li>have to</li><li>mustn’t</li><li>must</li><li>can</li>
+          <li>may</li><li>could</li><li>can’t</li><li>will be able to</li><li>ought to</li>
+        </ol></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  const openBtn = document.getElementById('teacher-key-btn');
+  const modal = document.getElementById('teacher-key');
+  const unlockBtn = document.getElementById('teacher-unlock');
+  const passInp = document.getElementById('teacher-pass');
+  const hint = document.getElementById('teacher-hint');
+  const content = document.getElementById('teacher-key-content');
+  const PASSWORD = 'teacher'; // requested password
+
+  openBtn?.addEventListener('click', ()=>{
+    modal.style.display = 'flex';
+    passInp.value = '';
+    content.style.display = 'none';
+    hint.textContent = '';
+    passInp.focus();
+  });
+  unlockBtn?.addEventListener('click', ()=>{
+    if (passInp.value === PASSWORD){
+      content.style.display = 'block';
+      hint.textContent = 'Unlocked';
+    } else {
+      hint.textContent = 'Wrong password.';
+      content.style.display = 'none';
+    }
+  });
+  passInp?.addEventListener('keydown', (e)=>{
+    if(e.key==='Enter'){ unlockBtn.click(); }
+  });
+  modal?.addEventListener('click', (e)=>{
+    if(e.target === modal){ modal.style.display='none'; }
+  });
+})();
+</script>
+
+</body>
+</html>
